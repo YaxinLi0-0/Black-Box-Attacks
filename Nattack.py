@@ -76,6 +76,8 @@ def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, ma
                         success = True
                         print('succeed attack Images: '+str(succImages)+'     totalImages: '+str(totalImages))
                         print('steps: '+ str(runstep))
+                        save_image(inputs, str(i) + '_clean.png')
+                        save_image(realclipinput, str(i) + '.png')
                         successlist.append(i)
                         printlist.append(runstep)
                         break
@@ -109,10 +111,6 @@ def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, ma
         else:
             #print('succeed:',successlist.__len__()
 
-            import ipdb
-            ipdb.set_trace()
-            save_image(inputs, str(i) + '_clean.png')
-            save_image(mu, str(i) + '.png')
             print('....................................')
 
 if __name__ == "__main__":
@@ -125,6 +123,6 @@ if __name__ == "__main__":
     test_data = torchvision.datasets.MNIST(root = data_path, train = False, transform = torchvision.transforms.ToTensor())
     dataloader = torch.utils.data.DataLoader(test_data, batch_size = 1)
 
-    Nattack(victim, dataloader, classnum = 10, clip_max = 1, clip_min = 0, epsilon = 0.1, population = 300, max_iterations = 400, learning_rate = 2, sigma = 0.1, target_or_not = False)
+    Nattack(victim, dataloader, classnum = 10, clip_max = 1, clip_min = 0, epsilon = 0.2, population = 400, max_iterations = 400, learning_rate = 2, sigma = 0.1, target_or_not = False)
 
 
