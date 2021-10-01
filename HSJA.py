@@ -16,7 +16,6 @@ def binsearch_boundary(src_pt,
     '''
 
     while torch.linalg.norm(dest_pt - src_pt) >= threshold:
-        print(torch.linalg.norm(dest_pt - src_pt), threshold)
         midpoint = (src_pt + dest_pt) / 2
         if indicator_function(model, midpoint, target_label) == 1:
             dest_pt = midpoint
@@ -43,27 +42,20 @@ def estimate_gradient(orig_pt,
     '''
     # sample directions
 
-    import ipdb
-    ipdb.set_trace()
-
     directions = torch.from_numpy(np.random.randn(sample_count, orig_pt.shape[1], orig_pt.shape[2], orig_pt.shape[3])).float().to('cuda')
-    directions /= torch.linalg.norm(directions, axis=0, dtype = torch.float)
+    directions /= torch.linalg.norm(directions, dim = (1, 2, 3), dtype = torch.float).reshape(sample_count, 1, 1, 1).repeat(1, orig_pt.shape[1], orig_pt.shape[2], orig_pt.shape[3])
 
     # get phi values
-    values = torch.from_numpy(np.empty((sample_count, 1), dtype=np.float)).to('cuda')
+    values = torch.from_numpy(np.empty((sample_count, 1), dtype = np.float)).to('cuda')
 
     for i in range(sample_count):
-        values[i, 0] = indicator_function(model, orig_pt + directions[i, :], target_label) * 2 - 1
+        values[i, 0] = indicator_function(model, orig_pt + directions[i, :] * step_size, target_label) * 2 - 1
     # subtract from the mean
 
-    import ipdb
-    ipdb.set_trace()
-
-    values -= torch.mean(values)
-    # and average them
-    avg = np.sum(directions * values, axis=0) / (sample_count - 1)
+    avg = torch.sum(directions * values.reshape(sample_count, 1, 1 ,1), dim = 0) / (sample_count - 1)
     # project them to unit L2
-    return avg / np.linalg.norm(avg)
+    norm_avg = avg / torch.linalg.norm(avg)
+    return norm_avg.float()
 
 def gradient_descent(orig_pt,
                      grad,
@@ -77,6 +69,7 @@ def gradient_descent(orig_pt,
     :param step_size:  initial step size to try
     '''
     # find the step size to stay in phi=1
+
     while True:
         new_vector = orig_pt + step_size * grad
         if indicator_function(model, new_vector, target_label):
@@ -88,7 +81,7 @@ def hopskipjumpattack(orig_pt,
                       model,
                       max_iter: Optional[int] = 100,
                       init_grad_queries: Optional[int] = 100,
-                      binsearch_threshold: Optional[float] = 5e-6,
+                      binsearch_threshold: Optional[float] = 2e-6,
                       dest_pt = None,
                       target_label = None,
                       device = 'cuda'
@@ -123,10 +116,8 @@ def hopskipjumpattack(orig_pt,
         # if the error is too small, return as is
         distance = torch.linalg.norm(boundary - orig_pt)
         if distance < binsearch_threshold:
-            print(distance)
             print('Step size too small, terminating...')
             # this works because we return the phi=1 endpoint in binsearch.
-            print(torch.argmax(boundary))
             return boundary
 
         # estimate the gradient
@@ -163,12 +154,19 @@ if __name__ == '__main__':
     ori_img, ori_label = next(iter(testloader))
     iterator = iter(testloader)
     target_img, target_label = next(iterator)
-    while (ori_label == target_label):
-        target_img, target_label = next(iterator)
 
     ori_img, ori_label = ori_img.to('cuda'), ori_label.to('cuda')
     target_img, target_label = target_img.to('cuda'), target_label.to('cuda')
+
+    while (ori_label == target_label or torch.argmax(model(target_img)) != target_label):
+        target_img, target_label = next(iterator)
+        ori_img, ori_label = ori_img.to('cuda'), ori_label.to('cuda')
+        target_img, target_label = target_img.to('cuda'), target_label.to('cuda')
+
+
     print('original label:', ori_label)
     print('target label:', target_label)
-    hopskipjumpattack(ori_img, model, dest_pt = target_img, target_label = target_label)
-
+    print(torch.argmax(model(target_img)) == target_label)
+    print(indicator_function(model, target_img, target_label))
+    adv_img = hopskipjumpattack(ori_img, model, dest_pt = target_img, target_label = target_label)
+    print('attack label:', torch.argmax(model(adv_img)))
