@@ -4,6 +4,7 @@ This is a black-box attack library.
 # Attack Methods  
 |   Attack Methods   | Attack Type |  Links |
 |--------------------|-------------|------|
+| Zoo | score based |  [ZOO: Zeroth Order Optimization based Black-box Attacks to Deep Neural Networks without Training Substitute Models](https://arxiv.org/pdf/1708.03999.pdf) |
 | Nattack | score based |  [NATTACK: Learning the Distributions of Adversarial Examples for an Improved Black-Box Attack on Deep Neural Networks](https://arxiv.org/pdf/1905.00441.pdf) |
 | SimBA | score based | [Simple Black-box Adversarial Attacks](https://arxiv.org/pdf/1905.07121.pdf) 
 | Boundary Attack | decision based |  [Decision-Based Adversarial Attacks: Reliable Attacks Against Black-Box Machine Learning Models](https://arxiv.org/pdf/1712.04248.pdf) |
