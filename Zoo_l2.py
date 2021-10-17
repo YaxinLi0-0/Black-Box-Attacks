@@ -1,3 +1,4 @@
+import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -19,7 +20,7 @@ from setup_cifar10_model import CIFAR10
 @jit(nopython=True)
 def coordinate_ADAM(losses, indice, grad, hess, batch_size, mt_arr, vt_arr, real_modifier, adam_epoch, up, down, step_size,beta1, beta2, proj):
   for i in range(batch_size):
-    grad[i] = (losses[i*2+1] - losses[i*2+2]) / 0.0002 
+    grad[i] = (losses[i*2+1] - losses[i*2+2]) / 0.0002
   # ADAM update
   mt = mt_arr[indice]
   mt = beta1 * mt + (1 - beta1) * grad
@@ -30,7 +31,7 @@ def coordinate_ADAM(losses, indice, grad, hess, batch_size, mt_arr, vt_arr, real
   epoch = adam_epoch[indice]
   corr = (np.sqrt(1 - np.power(beta2,epoch))) / (1 - np.power(beta1, epoch))
   m = real_modifier.reshape(-1)
-  old_val = m[indice] 
+  old_val = m[indice]
   old_val -= step_size * corr * mt / (np.sqrt(vt) + 1e-8)
   # set it back to [-0.5, +0.5] region
   if proj:
@@ -42,12 +43,12 @@ def coordinate_ADAM(losses, indice, grad, hess, batch_size, mt_arr, vt_arr, real
 def coordinate_Newton(losses, indice, grad, hess, batch_size, mt_arr, vt_arr, real_modifier, adam_epoch, up, down, step_size, beta1, beta2, proj):
   cur_loss = losses[0]
   for i in range(batch_size):
-    grad[i] = (losses[i*2+1] - losses[i*2+2]) / 0.0002 
+    grad[i] = (losses[i*2+1] - losses[i*2+2]) / 0.0002
     hess[i] = (losses[i*2+1] - 2 * cur_loss + losses[i*2+2]) / (0.0001 * 0.0001)
   hess[hess < 0] = 1.0
   hess[hess < 0.1] = 0.1
   m = real_modifier.reshape(-1)
-  old_val = m[indice] 
+  old_val = m[indice]
   old_val -= step_size * grad / hess
   # set it back to [-0.5, +0.5] region
   if proj:
@@ -63,7 +64,7 @@ def loss_run(input,target,model,modifier,use_tanh,use_log,targeted,confidence,co
   output = model(pert_out)
   if use_log:
     output = F.softmax(output,-1)
-  
+
   if use_tanh:
     loss1 = torch.sum(torch.square(pert_out-torch.tanh(input)/2),dim=(1,2,3))
   else:
@@ -71,33 +72,33 @@ def loss_run(input,target,model,modifier,use_tanh,use_log,targeted,confidence,co
 
   real = torch.sum(target*output,-1)
   other = torch.max((1-target)*output-(target*10000),-1)[0]
- 
+
   if use_log:
     real=torch.log(real+1e-30)
     other=torch.log(other+1e-30)
-  
+
   confidence = torch.tensor(confidence).type(torch.float64).cuda()
-  
+
   if targeted:
     loss2 = torch.max(other-real,confidence)
   else:
     loss2 = torch.max(real-other,confidence)
-  
+
   loss2 = const*loss2
   l2 = loss1
   loss = loss1 + loss2
-  
+
   return loss.detach().cpu().numpy(), l2.detach().cpu().numpy(), loss2.detach().cpu().numpy(), output.detach().cpu().numpy(), pert_out.detach().cpu().numpy()
 
 def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_adam_after_found=True,abort_early=True,
               batch_size=128,max_iter=1000,const=0.01,confidence=0.0,early_stop_iters=100, binary_search_steps=9,
               step_size=0.01,adam_beta1=0.9,adam_beta2=0.999):
-  
+
   early_stop_iters = early_stop_iters if early_stop_iters != 0 else max_iter // 10
 
   input = torch.from_numpy(input).cuda()
   target = torch.from_numpy(target).cuda()
-  
+
   var_len = input.view(-1).size()[0]
   modifier_up = np.zeros(var_len, dtype=np.float32)
   modifier_down = np.zeros(var_len, dtype=np.float32)
@@ -111,10 +112,10 @@ def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_a
   upper_bound=1e10
   lower_bound=0.0
   out_best_attack=input.clone().detach().cpu().numpy()
-  out_best_const=const  
+  out_best_const=const
   out_bestl2=1e10
   out_bestscore=-1
-  
+
 
   if use_tanh:
     input = torch.atanh(input*1.99999)
@@ -122,7 +123,7 @@ def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_a
   if not use_tanh:
     modifier_up = 0.5-input.clone().detach().view(-1).cpu().numpy()
     modifier_down = -0.5-input.clone().detach().view(-1).cpu().numpy()
-  
+
   def compare(x,y):
     if not isinstance(x, (float, int, np.int64)):
       if targeted:
@@ -145,7 +146,7 @@ def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_a
     vt.fill(0)
     adam_epoch.fill(1)
     stage=0
-    
+
     for iter in range(max_iter):
       if (iter+1)%100 == 0:
         loss, l2, loss2, _ , __ = loss_run(input,target,model,real_modifier,use_tanh,use_log,targeted,confidence,const)
@@ -160,20 +161,20 @@ def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_a
         var[i*2+2].reshape(-1)[indice[i]]-=0.0001
       var = torch.from_numpy(var)
       var = var.view((-1,)+input.size()[1:]).cuda()
-      losses, l2s, losses2, scores, pert_images = loss_run(input,target,model,var,use_tanh,use_log,targeted,confidence,const) 
+      losses, l2s, losses2, scores, pert_images = loss_run(input,target,model,var,use_tanh,use_log,targeted,confidence,const)
       real_modifier_numpy = real_modifier.clone().detach().cpu().numpy()
       if solver=="adam":
         coordinate_ADAM(losses,indice,grad,hess,batch_size,mt,vt,real_modifier_numpy,adam_epoch,modifier_up,modifier_down,step_size,adam_beta1,adam_beta2,proj=not use_tanh)
       if solver=="newton":
         coordinate_Newton(losses,indice,grad,hess,batch_size,mt,vt,real_modifier_numpy,adam_epoch,modifier_up,modifier_down,step_size,adam_beta1,adam_beta2,proj=not use_tanh)
       real_modifier=torch.from_numpy(real_modifier_numpy).cuda()
-      
+
       if losses2[0]==0.0 and last_loss2!=0.0 and stage==0:
         if reset_adam_after_found:
           mt.fill(0)
           vt.fill(0)
           adam_epoch.fill(1)
-        stage=1 
+        stage=1
       last_loss2=losses2[0]
 
       if abort_early and (iter+1) % early_stop_iters == 0:
@@ -181,7 +182,7 @@ def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_a
             print("Early stopping because there is no improvement")
             break
         prev = losses[0]
-     
+
       if l2s[0] < bestl2 and compare(scores[0], np.argmax(target.cpu().numpy(),-1)):
         bestl2 = l2s[0]
         bestscore = np.argmax(scores[0])
@@ -194,7 +195,7 @@ def l2_attack(input, target, model, targeted, use_log, use_tanh, solver, reset_a
         out_bestscore = np.argmax(scores[0])
         out_best_attack = pert_images[0]
         out_best_const = const
-  
+
     if compare(bestscore,  np.argmax(target.cpu().numpy(),-1)) and bestscore != -1:
       print('old constant: ', const)
       upper_bound = min(upper_bound,const)
@@ -248,27 +249,40 @@ def attack(inputs, targets, model, targeted, use_log, use_tanh, solver, device):
   # run 1 image at a time, minibatches used for gradient evaluation
   for i in range(len(inputs)):
     print('tick',i+1)
+
     attack,score=l2_attack(np.expand_dims(inputs[i],0), np.expand_dims(targets[i],0), model, targeted, use_log, use_tanh, solver, device)
+
     r.append(attack)
   return np.array(r)
 
 if __name__=='__main__':
+
+
+  parser = argparse.ArgumentParser()
+  parser.add_argument('--dataset', choices = ["CIFAR10", "MNIST"], default = "MNIST")
+  parser.add_argument('--samples', type = int, default = 1)
+  args = parser.parse_args()
+
+
   np.random.seed(42)
   torch.manual_seed(42)
-
-  transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
-  # test_set = datasets.MNIST(root = './data', train=False, transform = transform, download=True)
-  test_set = datasets.CIFAR10(root = './data', train=False, transform = transform, download=True)
-  test_loader = torch.utils.data.DataLoader(test_set,batch_size=1,shuffle=True)
 
   use_cuda=True
   device = torch.device("cuda" if (use_cuda and torch.cuda.is_available()) else "cpu")
 
-  # model = MNIST().to(device)
-  model = CIFAR10().to(device) 
+  transform = transforms.Compose([transforms.ToTensor(), transforms.Normalize((0.5,), (1.0,))])
+  if(args.dataset == "MNIST"):
+    test_set = datasets.MNIST(root = './data', train=False, transform = transform, download=True)
+    test_loader = torch.utils.data.DataLoader(test_set,batch_size=1,shuffle=True)
+    model = MNIST().to(device)
+    model.load_state_dict(torch.load('./models/mnist_model.pt'))
 
-  # model.load_state_dict(torch.load('./models/mnist_model.pt'))
-  model.load_state_dict(torch.load('./models/cifar10_model.pt'))
+  if(args.dataset == "CIFAR10"):
+    test_set = datasets.CIFAR10(root = './data', train=False, transform = transform, download=True)
+    test_loader = torch.utils.data.DataLoader(test_set,batch_size=1,shuffle=True)
+    model = CIFAR10().to(device)
+    model.load_state_dict(torch.load('./models/cifar10_model.pt'))
+
   model.eval()
 
   use_log=True
@@ -276,9 +290,9 @@ if __name__=='__main__':
   targeted=True
   solver="newton"
   #start is a offset to start taking sample from test set
-  #samples is the how many samples to take in total : for targeted, 1 means all 9 class target -> 9 total samples whereas for untargeted the original data 
-  #sample is taken i.e. 1 sample only 
-  inputs, targets = generate_data(test_loader,targeted,samples=10,start=6)
+  #samples is the how many samples to take in total : for targeted, 1 means all 9 class target -> 9 total samples whereas for untargeted the original data
+  #sample is taken i.e. 1 sample only
+  inputs, targets = generate_data(test_loader,targeted, samples = args.samples, start=6)
   timestart = time.time()
   adv = attack(inputs, targets, model, targeted, use_log, use_tanh, solver, device)
   timeend = time.time()
@@ -291,7 +305,7 @@ if __name__=='__main__':
   else:
     valid_class = np.argmax(model(torch.from_numpy(inputs).cuda()).detach().cpu().numpy(),-1)
     adv_class = np.argmax(model(torch.from_numpy(adv).cuda()).detach().cpu().numpy(),-1)
-    
+
   acc = ((valid_class==adv_class).sum())/len(inputs)
   print("Valid Classification: ", valid_class)
   print("Adversarial Classification: ", adv_class)
@@ -304,7 +318,7 @@ if __name__=='__main__':
   #   save(adv[i], "adversarial_"+str(i)+".png")
   #   save(adv[i] - inputs[i], "diff_"+str(i)+".png")
 
-  #visualization of created mnist adv examples 
+  #visualization of created mnist adv examples
   # cnt=0
   # plt.figure(figsize=(10,10))
   # for i in range(len(adv)):
@@ -319,14 +333,15 @@ if __name__=='__main__':
   #   if solver=="newton":
   #     plt.savefig('newton_targeted_mnist.png')
   #   else:
-  #     plt.savefig('adam_targeted_mnist.png') 
+  #     plt.savefig('adam_targeted_mnist.png')
   # else:
   #   if solver=="newton":
     #   plt.savefig('newton_untargeted_mnist.png')
     # else:
-    #   plt.savefig('adam_untargeted_mnist.png') 
+    #   plt.savefig('adam_untargeted_mnist.png')
 
-  #visualization of created cifar10 adv examples 
+  """
+  #visualization of created cifar10 adv examples
   classes = ('plane', 'car', 'bird', 'cat', 'deer','dog', 'frog', 'horse', 'ship', 'truck')
   cnt=0
   plt.figure(figsize=(10,10))
@@ -342,11 +357,11 @@ if __name__=='__main__':
     if solver=="newton":
       plt.savefig('newton_targeted_cifar10.png')
     else:
-      plt.savefig('adam_targeted_cifar10.png') 
+      plt.savefig('adam_targeted_cifar10.png')
   else:
     if solver=="newton":
       plt.savefig('newton_untargeted_cifar10.png')
     else:
-      plt.savefig('adam_untargeted_cifar10.png') 
+      plt.savefig('adam_untargeted_cifar10.png')
 
-
+  """
