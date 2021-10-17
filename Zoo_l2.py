@@ -11,8 +11,8 @@ import scipy.misc
 import os
 import sys
 from PIL import Image
-from setup_mnist_model import MNIST
-from setup_cifar10_model import CIFAR10
+from networks import MNIST
+from networks import CIFAR10
 
 """##L2 Black Box Attack"""
 
