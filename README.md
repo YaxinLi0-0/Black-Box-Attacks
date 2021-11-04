@@ -3,7 +3,7 @@ This is a black-box attack library.
 
 # Attack Methods  
 |   Attack Methods   | Attack Type | Similarity | Links |
-|--------------------|-------------|------|
+|--------------------|-------------|------|------|
 | Zoo | score based | L_2 | [ZOO: Zeroth Order Optimization based Black-box Attacks to Deep Neural Networks without Training Substitute Models](https://arxiv.org/pdf/1708.03999.pdf) |
 | Nattack | score based | L_inf | [NATTACK: Learning the Distributions of Adversarial Examples for an Improved Black-Box Attack on Deep Neural Networks](https://arxiv.org/pdf/1905.00441.pdf) |
 | SimBA | score based | L_2 | [Simple Black-box Adversarial Attacks](https://arxiv.org/pdf/1905.07121.pdf) 
