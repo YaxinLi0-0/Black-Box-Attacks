@@ -6,6 +6,8 @@ from resnet import *
 from CNN import *
 import torchvision
 from torchvision.utils import save_image
+import os
+from data_loader import *
 
 def onehot_like(a, index, value=1):
     x = np.zeros_like(a)
@@ -20,7 +22,7 @@ def arctanh(x, eps=1e-6):
     x *= (1. - eps)
     return (np.log((1 + x) / (1 - x))) * 0.5
 
-def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, max_iterations, learning_rate, sigma, target_or_not):
+def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, max_iterations, learning_rate, sigma, target_or_not, print_process = False, num_sample = None):
 
     #initialization
     totalImages = 0
@@ -28,9 +30,10 @@ def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, ma
     faillist = []
     successlist = []
     printlist = []
-
+    model.eval()
     for i, (inputs, targets) in enumerate(loader):
-
+        if num_sample != None and i>= num_sample:
+            break
         success = False
         print('attack picture No. ' + str(i))
 
@@ -44,6 +47,7 @@ def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, ma
 
         ## skip wrongly classified samples
         if  predict.argmax(dim = 1, keepdim = True) != targets:
+
             print('skip the wrong example ', i)
             continue
         totalImages += 1
@@ -74,8 +78,11 @@ def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, ma
                     if sum(predict.argmax(dim = 1, keepdim = True)[0] != targets) > 0 and (np.abs(realclipdist).max() <= epsilon):
                         succImages += 1
                         success = True
+
                         print('succeed attack Images: '+str(succImages)+'     totalImages: '+str(totalImages))
-                        print('steps: '+ str(runstep))
+                        if print_process == True:
+                            print('steps: '+ str(runstep))
+
                         save_image(inputs, str(i) + '_clean.png')
                         save_image(realclipinput, str(i) + '.png')
                         successlist.append(i)
@@ -102,19 +109,24 @@ def Nattack(model, loader, classnum, clip_max, clip_min, epsilon, population, ma
             A = np.array(A, dtype= np.float32)
 
             mu = mu - torch.from_numpy((learning_rate/(population*sigma)) *
-                                               ((np.dot(eps.reshape(population,-1).T, A)).reshape(1, 1, 28, 28)))
+                                               ((np.dot(eps.reshape(population,-1).T, A)).reshape(1, c, l, w)))
 
         if not success:
             faillist.append(i)
-            print('failed:',faillist.__len__())
-            print('....................................')
-        else:
-            #print('succeed:',successlist.__len__()
+            print('failed attack Images: '+str(succImages)+'     totalImages: '+str(totalImages))
 
-            print('....................................')
+        if print_process == True:
+            if not success:
+                print('failed:',faillist.__len__())
+                print('....................................')
+            else:
+                print('succeed:',successlist.__len__())
+                print('....................................')
+    print('total success rate:', successlist.__len__()/(successlist.__len__() + faillist.__len__()))
+
 
 if __name__ == "__main__":
-
+    """
     model_path = './mnist_cnn.pt'
     data_path = '/mnt/home/liyaxin1/Documents/data/'
 
@@ -122,7 +134,15 @@ if __name__ == "__main__":
     victim.load_state_dict(torch.load(model_path, map_location = torch.device('cuda')))
     test_data = torchvision.datasets.MNIST(root = data_path, train = False, transform = torchvision.transforms.ToTensor())
     dataloader = torch.utils.data.DataLoader(test_data, batch_size = 1)
+    """
+    current_path = os.getcwd()
+    model_path = './clean.pt'
+    data_path = os.path.join(current_path, 'data/')
+    print(current_path, data_path)
+    model = ResNet18()
+    model.load_state_dict(torch.load(model_path))
+    train_loader, test_loader = get_cifar10_loader(batch_size = 1)
 
-    Nattack(victim, dataloader, classnum = 10, clip_max = 1, clip_min = 0, epsilon = 0.2, population = 400, max_iterations = 400, learning_rate = 2, sigma = 0.1, target_or_not = False)
+    Nattack(model, test_loader, classnum = 10, clip_max = 1, clip_min = 0, epsilon = 0.2, population = 400, max_iterations = 400, learning_rate = 2, sigma = 0.1, target_or_not = False, print_process = False, num_sample = 500)
 
 
